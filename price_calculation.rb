@@ -12,11 +12,36 @@ require './models/order.rb'
 
 class PriceCalculation
   def initialize(order_id)
+    @order = find_order(order_id)
+    @campaigns = Campaign.running_campaigns(@order.order_date) # 找到在訂單日期適用的促銷活動
   end
 
   def total
+    total_price = @order.price
+    total_discount = 0
+
+    # 計算滿足訂單日期的促銷活動中最大的折扣
+    if @campaigns.any?
+      max_discount = @campaigns.max_by(&:discount_ratio).discount_ratio
+      total_discount = (total_price * max_discount / 100).to_i
+    end
+
+    total_price -= total_discount
+
+    total_price += 60 if !free_shipment?
+
+    total_price
   end
 
   def free_shipment?
+    @order.price >= 1500
+  end
+
+  private
+
+  def find_order(order_id)
+    order = Order.find(order_id)
+    raise Order::NotFound if order.nil?
+    order
   end
 end
